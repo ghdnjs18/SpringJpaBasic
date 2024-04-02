@@ -1,6 +1,7 @@
-package jpabook.jpashop.domain;
+package jpabook.jpashop.domain.item;
 
 import jakarta.persistence.*;
+import jpabook.jpashop.domain.Category;
 import lombok.Getter;
 
 import java.util.ArrayList;
@@ -8,8 +9,8 @@ import java.util.List;
 
 @Entity
 @Getter
-@DiscriminatorColumn(name = "dtype") //
-@Inheritance(strategy = InheritanceType.SINGLE_TABLE) //
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE) // 상속관계 설계 전략
+@DiscriminatorColumn(name = "dtype") // 상속관계 구분
 public abstract class Item {
 
     @Id
