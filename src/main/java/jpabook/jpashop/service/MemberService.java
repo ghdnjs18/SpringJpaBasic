@@ -41,7 +41,7 @@ public class MemberService {
      * @return
      */
     public Member findMember(Long memberId) {
-        return memberRepository.find(memberId);
+        return memberRepository.findOne(memberId);
     }
 
     private void validateDuplicateMember(Member member) {
