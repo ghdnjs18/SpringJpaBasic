@@ -17,11 +17,14 @@ public class ItemService {
 
     /**
      * 상품 등록
+     *
      * @param item
+     * @return
      */
     @Transactional
-    public void saveItem(Item item) {
+    public Long saveItem(Item item) {
         itemRepository.save(item);
+        return item.getId();
     }
 
     /**

@@ -4,12 +4,14 @@ import jakarta.persistence.*;
 import jpabook.jpashop.domain.Category;
 import jpabook.jpashop.exception.NotEnoughStockException;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Getter
+@Setter
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE) // 상속관계 설계 전략
 @DiscriminatorColumn(name = "dtype") // 상속관계 구분
 public abstract class Item {
