@@ -6,22 +6,36 @@ import jpabook.jpashop.domain.Member;
 import jpabook.jpashop.domain.Order;
 import jpabook.jpashop.domain.OrderStatus;
 import jpabook.jpashop.domain.item.Book;
+import jpabook.jpashop.domain.item.Item;
 import jpabook.jpashop.exception.NotEnoughStockException;
 import jpabook.jpashop.repository.OrderRepository;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 @Transactional
+@Rollback(value = false)
 class OrderServiceTest {
 
+    @Autowired MemberService memberService;
     @Autowired OrderService orderService;
     @Autowired OrderRepository orderRepository;
     @Autowired EntityManager em;
+
+    @Autowired
+    ItemService itemService;
 
     // 통합 테스트
     @Test
@@ -42,7 +56,6 @@ class OrderServiceTest {
         assertEquals(1, getOrder.getOrderItems().size(), "주문한 상품 종류 수가 정확해야 한다.");
         assertEquals(10000 * 2, getOrder.getTotalPrice(), "주문 가격은 가격 * 수량이다.");
         assertEquals(8, book.getStockQuantity(), "주문 수량만큼 재고가 줄어야 한다.");
-
     }
 
     @Test
@@ -81,11 +94,62 @@ class OrderServiceTest {
         assertEquals(10, book.getStockQuantity(), "주문이 취소된 상품은 그만큼 재고가 증가해야 한다.");
     }
 
+//    @BeforeEach
+    public void before() {
+        Member member = createMember();
+        Book book = getBook("시골 JPA", 10000, 101);
+
+        System.out.println("BeforeEach 종료");
+    }
+
+    @Test
+    @DisplayName("동시성 제어 - 비관적 락")
+    public void concurrency() throws InterruptedException {
+        System.out.println("test 시작");
+        // given
+//        Member member1 = createMember();
+//        Book book = getBook("시골 JPA", 10000, 101);
+        int orderCount = 1;
+
+        int threadCount = 20;
+        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        List<Member> members = memberService.findMembers();
+        for (Member member : members) {
+            System.out.println("member.getName() = " + member.getName());
+        }
+        // when
+        for (int i = 0; i < threadCount; i++) {
+            executorService.execute(() -> {
+                try {
+                    List<Member> members2 = memberService.findMembers();
+                    for (Member member : members2) {
+                        System.out.println("member.getName() = " + member.getName());
+                    }
+                    orderService.order(1L, 1L, orderCount);
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+
+        latch.await();
+        executorService.shutdown();
+
+        // then
+        Item result = itemService.findOne(1L);
+        System.out.println("result.getName() = " + result.getName());
+//        assertEquals(result.getStockQuantity(), 80);
+        System.out.println("test 종료");
+    }
+
     private Member createMember() {
         Member member = new Member();
         member.setName("회원1");
         member.setAddress(new Address("서울", "강가", "123-123"));
         em.persist(member);
+//        memberService.join(member);
         return member;
     }
 
@@ -95,6 +159,7 @@ class OrderServiceTest {
         book.setPrice(orderPrice);
         book.setStockQuantity(stockQuantity);
         em.persist(book);
+//        itemService.saveItem(book);
         return book;
     }
 
