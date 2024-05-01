@@ -1,4 +1,7 @@
 spring:
+  profiles:
+    active: local
+
   datasource:
 #    url: jdbc:h2:tcp://localhost/~/jpashop
     url: jdbc:h2:mem:testdb # 메모리 디비 사용
@@ -14,7 +17,7 @@ spring:
       hibernate:
 #        show_sql: true
         format_sql: true
-        default_batch_fetch_size: 100
+#        default_batch_fetch_size: 100
 
 logging:
   level:

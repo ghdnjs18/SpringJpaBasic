@@ -42,6 +42,14 @@ public class ItemRepository {
 //                .getSingleResult();
     }
 
+    public Item findOne2(Long id) {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("jakarta.persistence.lock.timeout", 10000);
+
+//        return em.find(Item.class, id);
+        return em.find(Item.class, id, LockModeType.OPTIMISTIC);
+    }
+
     public List<Item> findAll() {
         return em.createQuery("SELECT i FROM Item i", Item.class)
                 .getResultList();

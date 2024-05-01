@@ -13,20 +13,20 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 @Transactional
-@Rollback(value = false)
 class OrderServiceTest {
 
     @Autowired MemberService memberService;
@@ -103,6 +103,7 @@ class OrderServiceTest {
     }
 
     @Test
+    @Rollback(value = false)
     @DisplayName("동시성 제어 - 비관적 락")
     public void concurrency() throws InterruptedException {
         System.out.println("test 시작");
@@ -115,18 +116,10 @@ class OrderServiceTest {
         ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
         CountDownLatch latch = new CountDownLatch(threadCount);
 
-        List<Member> members = memberService.findMembers();
-        for (Member member : members) {
-            System.out.println("member.getName() = " + member.getName());
-        }
         // when
         for (int i = 0; i < threadCount; i++) {
             executorService.execute(() -> {
                 try {
-                    List<Member> members2 = memberService.findMembers();
-                    for (Member member : members2) {
-                        System.out.println("member.getName() = " + member.getName());
-                    }
                     orderService.order(1L, 1L, orderCount);
                 } finally {
                     latch.countDown();
@@ -139,9 +132,56 @@ class OrderServiceTest {
 
         // then
         Item result = itemService.findOne(1L);
-        System.out.println("result.getName() = " + result.getName());
-//        assertEquals(result.getStockQuantity(), 80);
+        assertEquals(result.getStockQuantity(), 80);
         System.out.println("test 종료");
+    }
+
+    @Test
+    @Rollback(value = false)
+    @DisplayName("동시성 제어 - 낙관적 락")
+    public void concurrency2() throws InterruptedException {
+        // given
+        int orderCount = 1;
+
+        int threadCount = 20;
+        ExecutorService executorService = Executors.newFixedThreadPool(5);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        // when
+        AtomicInteger retryCount = new AtomicInteger();
+        int maxRetries = 10;
+        for (int i = 0; i < threadCount; i++) {
+            executorService.execute(() -> {
+                while (retryCount.get() < maxRetries) {
+                    try {
+                        orderService.order2(1L, 1L, orderCount);
+
+                        latch.countDown();
+
+                        break;
+                    } catch (OptimisticLockingFailureException e) {
+                        retryCount.getAndIncrement();
+                        if (retryCount.get() >= maxRetries) {
+                            System.out.println("재시도 횟수 초과");
+                            throw e;
+                        }
+                        System.out.println("락획득 재시도 합니다.");
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException ex) {
+                            throw new RuntimeException(ex);
+                        }
+                    }
+                }
+            });
+        }
+
+        latch.await();
+        executorService.shutdown();
+
+        // then
+        Item result = itemService.findOne(1L);
+        assertEquals(result.getStockQuantity(), 80);
     }
 
     private Member createMember() {

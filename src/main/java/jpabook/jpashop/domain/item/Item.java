@@ -30,6 +30,9 @@ public abstract class Item {
     @ManyToMany(mappedBy = "items")
     private List<Category> categories = new ArrayList<>();
 
+    @Version
+    private Integer version;
+
     /**
      * stock 증가
      * @param quantity
